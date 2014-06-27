@@ -12,13 +12,13 @@ import collections
 import functools
 import copy
 
-def transform(N, size=None):
+def transform(N, max_r=None):
     """
     (Nondestructively) transform the list of values by averaging them with
     neighboring zeros.
 
-    If size is specified, only generate Z[r] for r in range(size).  Otherwise,
-    size defaults to len(N).
+    The maximum r value is assumed to be len[N] unless specified otherwise with
+    max_r. This enables use of defaultdict instead of list to specify N vals.
 
     Identifiers are chosen to match those used by 
 
@@ -26,7 +26,7 @@ def transform(N, size=None):
     Quantitative Linguistics, 2:217-37, 1995.
     """
 
-    size = len(N) if size is None else size
+    size = len(N) if max_r is None else max_r+1
 
     Z = copy.copy(N)
 
