@@ -7,10 +7,13 @@ W. Gale. Good-Turing smoothing without tears. Journal of
 Quantitative Linguistics, 2:217-37, 1995.
 """
 
+from __future__ import division
+
 import unittest
+import collections
+import copy
 from math import log, exp
 import numpy
-from __future__ import division
 
 from . import averaging_transform
 from .memo import memoize
@@ -42,19 +45,22 @@ class Estimator(object):
         assert not self.N[0]
         self._precompute()
 
-    def _precompute():
+    def _precompute(self):
         """
         Do the necessary precomputation to compute estimates
         """
-        self.sum_N = sum(self.N[r] for r in range(1, max_r + 1))
-        self.Z = averaging_transform.transform(N, max_r)   # Z[r] = Z_r
-        self.a, self.b = self._regress(Z)   # 'a' and 'b' as used in the paper
+        self.sum_N = sum(self.N[r] for r in range(1, self.max_r + 1))
+        self.Z = averaging_transform.transform(self.N, self.max_r) # Z[r] = Z_r
+        self.a, self.b = self._regress(self.Z)  # 'a' and 'b' as used in (Gale)
         self.linear_cutoff = self._find_cutoff()
+        self.unnormalized_sum = sum(self.unnormalized_estimate(r)
+                                    for r in range(self.max_r + 1))
 
     def _regress(self, Z):
         # Make a set of the nonempty points in log scale
-        self.x, self.y = unzip(log(r), log(Z[r])
-                               for r in range(1, max_r + 1) if Z[r])
+        x, y = zip(*[(log(r), log(Z[r]))
+                               for r in range(1, self.max_r + 1) if Z[r]])
+        self.x, self.y = x, y
         matrix = numpy.array((x, numpy.ones(len(x)))).T
         return numpy.linalg.lstsq(matrix, y)[0]
 
@@ -70,13 +76,14 @@ class Estimator(object):
             cutoff += 1
         return cutoff
 
-    def _approx_turing_variance(r):
+    def _approx_turing_variance(self, r):
         """
         Compute the approximate variance of the turing estimate for r* given r,
         using the approximation given in (Gale):
 
         var(r^{*}_T) ≈ (r + 1)^2 (N_{r+1}/N_r^2) (1 + N_{r+1}/N_r)
         """
+        N = self.N
         return (r + 1)**2 * (N[r+1] / N[r]**2) * (1 + N[r+1] / N[r])
 
     @memoize(dict)
@@ -98,11 +105,262 @@ class Estimator(object):
         simple Turing estimate of r* for given r (unsmoothed):
              r* = (r + 1)(N_{r+1})/N_r
         """
-        return (r + 1) * N[r + 1] / N[r]
+        return (r + 1) * self.N[r + 1] / self.N[r]
 
     @memoize(dict)
-    def estimate(self, r):
+    def unnormalized_estimate(self, r):
         return (self.linear_estimate(r)
                 if r >= self.linear_cutoff
                 else self.turing_estimate(r))
 
+    @memoize(dict)
+    def estimate(self, r):
+        return self.unnormalized_estimate(r) / self.unnormalized_sum
+
+
+class ChinesePluralsTest(unittest.TestCase):
+    max_r = 1918
+    input = collections.defaultdict(lambda:0)
+    input.update([
+        (1, 268),
+        (2, 112),
+        (3, 70),
+        (4, 41),
+        (5, 24),
+        (6, 14),
+        (7, 15),
+        (8, 14),
+        (9, 8),
+        (10, 11),
+        (11, 9),
+        (12, 6),
+        (13, 6),
+        (14, 3),
+        (15, 7),
+        (16, 9),
+        (17, 4),
+        (18, 4),
+        (19, 8),
+        (20, 2),
+        (21, 4),
+        (22, 2),
+        (23, 2),
+        (24, 3),
+        (25, 4),
+        (26, 4),
+        (27, 4),
+        (28, 1),
+        (29, 1),
+        (31, 2),
+        (33, 1),
+        (39, 3),
+        (41, 1),
+        (46, 1),
+        (47, 1),
+        (50, 1),
+        (52, 2),
+        (53, 1),
+        (55, 1),
+        (57, 1),
+        (60, 1),
+        (74, 1),
+        (84, 1),
+        (108, 1),
+        (109, 1),
+        (177, 1),
+        (400, 1),
+        (1918, 1),
+    ])
+    output = copy.copy(input)
+    output.update([
+        (0, 0.04090978),
+        (1, 0.8414893),
+        (2, 1.887716),
+        (3, 2.288452),
+        (4, 3.247259),
+        (5, 4.222094),
+        (6, 5.206074),
+        (7, 6.195765),
+        (8, 7.189259),
+        (9, 8.185414),
+        (10, 9.183503),
+        (11, 10.18304),
+        (12, 11.1837),
+        (13, 12.18523),
+        (14, 13.18746),
+        (15, 14.19026),
+        (16, 15.19353),
+        (17, 16.19719),
+        (18, 17.20118),
+        (19, 18.20545),
+        (20, 19.20996),
+        (21, 20.21467),
+        (22, 21.21956),
+        (23, 22.22462),
+        (24, 23.22981),
+        (25, 24.23512),
+        (26, 25.24054),
+        (27, 26.24606),
+        (28, 27.25167),
+        (29, 28.25735),
+        (31, 30.26893),
+        (33, 32.28073),
+        (39, 38.31721),
+        (41, 40.32964),
+        (46, 45.36113),
+        (47, 46.36749),
+        (50, 49.38667),
+        (52, 51.39953),
+        (53, 52.40597),
+        (55, 54.41891),
+        (57, 56.43188),
+        (60, 59.45142),
+        (74, 73.54344),
+        (84, 83.60977),
+        (108, 107.7701),
+        (109, 108.7768),
+        (177, 177.2346),
+        (400, 401.744),
+        (1918, 1930.037),
+    ])
+
+    def test_output(self):
+        estimator = Estimator(N=self.input, max_r=self.max_r)
+        for key in output.keys():
+            self.assertEqual((key, estimator.estimate(key)),
+                             (key, output[key]))
+
+
+class ProsodyTest(ChinesePluralsTest):
+    max_r = 7846
+    input = collections.defaultdict(lambda:0)
+    input.update([
+        (1, 120),
+        (2, 40),
+        (3, 24),
+        (4, 13),
+        (5, 15),
+        (6, 5),
+        (7, 11),
+        (8, 2),
+        (9, 2),
+        (10, 1),
+        (12, 3),
+        (14, 2),
+        (15, 1),
+        (16, 1),
+        (17, 3),
+        (19, 1),
+        (20, 3),
+        (21, 2),
+        (23, 3),
+        (24, 3),
+        (25, 3),
+        (26, 2),
+        (27, 2),
+        (28, 1),
+        (31, 2),
+        (32, 2),
+        (33, 1),
+        (34, 2),
+        (36, 2),
+        (41, 3),
+        (43, 1),
+        (45, 3),
+        (46, 1),
+        (47, 1),
+        (50, 1),
+        (71, 1),
+        (84, 1),
+        (101, 1),
+        (105, 1),
+        (121, 1),
+        (124, 1),
+        (146, 1),
+        (162, 1),
+        (193, 1),
+        (199, 1),
+        (224, 1),
+        (226, 1),
+        (254, 1),
+        (257, 1),
+        (339, 1),
+        (421, 1),
+        (456, 1),
+        (481, 1),
+        (483, 1),
+        (1140, 1),
+        (1256, 1),
+        (1322, 1),
+        (1530, 1),
+        (2131, 1),
+        (2395, 1),
+        (6925, 1),
+        (7846, 1),
+    ])
+    output = copy.copy(input)
+    output.update([
+        (0, 0.003883244),
+        (1, 0.7628079),
+        (2, 1.706448),
+        (3, 2.679796),
+        (4, 3.663988),
+        (5, 4.653366),
+        (6, 5.645628),
+        (7, 6.63966),
+        (8, 7.634856),
+        (9, 8.63086),
+        (10, 9.627446),
+        (12, 11.62182),
+        (14, 13.61725),
+        (15, 14.61524),
+        (16, 15.61336),
+        (17, 16.6116),
+        (19, 18.60836),
+        (20, 19.60685),
+        (21, 20.6054),
+        (23, 22.60264),
+        (24, 23.60133),
+        (25, 24.60005),
+        (26, 25.5988),
+        (27, 26.59759),
+        (28, 27.59639),
+        (31, 30.59294),
+        (32, 31.59183),
+        (33, 32.59073),
+        (34, 33.58964),
+        (36, 35.58751),
+        (41, 40.58235),
+        (43, 42.58035),
+        (45, 44.57836),
+        (46, 45.57738),
+        (47, 46.57641),
+        (50, 49.57351),
+        (71, 70.55399),
+        (84, 83.54229),
+        (101, 100.5272),
+        (105, 104.5237),
+        (121, 120.5097),
+        (124, 123.507),
+        (146, 145.4879),
+        (162, 161.474),
+        (193, 192.4472),
+        (199, 198.4421),
+        (224, 223.4205),
+        (226, 225.4188),
+        (254, 253.3947),
+        (257, 256.3922),
+        (339, 338.3218),
+        (421, 420.2514),
+        (456, 455.2215),
+        (481, 480.2),
+        (483, 482.1983),
+        (1140, 1138.636),
+        (1256, 1254.537),
+        (1322, 1320.48),
+        (1530, 1528.302),
+        (2131, 2128.788),
+        (2395, 2392.562),
+        (6925, 6918.687),
+        (7846, 7838.899),
+    ])
