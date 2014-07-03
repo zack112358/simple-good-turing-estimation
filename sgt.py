@@ -39,7 +39,7 @@ class Estimator(object):
         with max_r. This enables use of defaultdict instead of list to specify
         N_r values.
         """
-        self.N = kwargs.pop('N')
+        self.N = copy.copy(kwargs.pop('N'))
         self.max_r = kwargs.pop('max_r', len(self.N))
         super(Estimator, self).__init__(*args, **kwargs)
         assert not self.N[0]
@@ -49,14 +49,20 @@ class Estimator(object):
         """
         Do the necessary precomputation to compute estimates
         """
-        self.sum_N = sum(self.N[r] for r in range(1, self.max_r + 1))
-        self.Z = averaging_transform.transform(self.N, self.max_r) # Z[r] = Z_r
-        self.a, self.b = self._regress(self.Z)  # 'a' and 'b' as used in (Gale)
+        N = self.N
+        N[0] = sum(N[r] for r in range(1, self.max_r + 1))
+        self.Z = Z = averaging_transform.transform(N, self.max_r)  # Z[r] = Z_r
+        self.b, self.a = self._regress(Z)    # 'a' and 'b' as used in (Gale); a
+                                             # is intercept and b is slope.
+        # Find the transition point between linear Good-Turing estimate and the
+        # Turing estimate.
         self.linear_cutoff = self._find_cutoff()
-        self.unnormalized_sum = sum(self.unnormalized_estimate(r)
-                                    for r in range(self.max_r + 1))
 
     def _regress(self, Z):
+        """
+        Perform linear regression on the given points in loglog space, return
+        result
+        """
         # Make a set of the nonempty points in log scale
         x, y = zip(*[(log(r), log(Z[r]))
                                for r in range(1, self.max_r + 1) if Z[r]])
@@ -97,7 +103,7 @@ class Estimator(object):
                 = (r+1)^{b+1) / r^b
                 = r (1 + 1/r)^{b+1}
         """
-        return r * (1 + 1/r)**(self.b + 1)
+        return r * (1 + 1/r)**(self.b + 1) if r > 0 else None
 
     @memoize(dict)
     def turing_estimate(self, r):
@@ -105,21 +111,20 @@ class Estimator(object):
         simple Turing estimate of r* for given r (unsmoothed):
              r* = (r + 1)(N_{r+1})/N_r
         """
-        return (r + 1) * self.N[r + 1] / self.N[r]
+        return ((r + 1) * self.N[r + 1] / self.N[r]
+                if self.N[r + 1] > 0 and self.N[r] > 0
+                else None)
 
     @memoize(dict)
-    def unnormalized_estimate(self, r):
+    def estimate(self, r):
         return (self.linear_estimate(r)
                 if r >= self.linear_cutoff
                 else self.turing_estimate(r))
 
-    @memoize(dict)
-    def estimate(self, r):
-        return self.unnormalized_estimate(r) / self.unnormalized_sum
-
 
 class ChinesePluralsTest(unittest.TestCase):
     max_r = 1918
+    maxDiff = None
     input = collections.defaultdict(lambda:0)
     input.update([
         (1, 268),
@@ -226,9 +231,10 @@ class ChinesePluralsTest(unittest.TestCase):
 
     def test_output(self):
         estimator = Estimator(N=self.input, max_r=self.max_r)
-        for key in output.keys():
-            self.assertEqual((key, estimator.estimate(key)),
-                             (key, output[key]))
+        for key in reversed(self.output.keys()):
+            self.assertAlmostEqual(estimator.estimate(key),
+                                   self.output[key],
+                                   places=4)
 
 
 class ProsodyTest(ChinesePluralsTest):
