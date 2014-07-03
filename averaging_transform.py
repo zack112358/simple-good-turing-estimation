@@ -41,13 +41,14 @@ def transform(N, max_r=None):
         # The paper doesn't really specify a way to handle the edge case where
         # there is no defined q or t, because this is the lowest or hightest R.
         # I am choosing to handle the lower case by setting q to 0 (which falls
-        # out of the above code naturally) , and the higher case by assuming
-        # that t/r likely equals r/q. This would be correct for the case where
-        # the log-log slope is -1, which won't really be true, but it'll be an
-        # okay guess.
+        # out of the above code naturally), and the higher case by duplicating
+        # their code, which just sets t = r + (r - q). I originally proceeded,
+        # by assuming that t/r likely equals r/q. This would be correct for the
+        # case where the log-log slope is -1, which won't really be true, but
+        # it'd be an okay guess. But Gale didn't do that, so we're not doing
+        # it.
         if t == size and q != 0:
-            # import pdb; pdb.set_trace()
-            t = r**2 / q
+            t = 2 * r - q
 
         Z[r] = N[r] * 2 / (t - q)
 
@@ -102,14 +103,14 @@ class MadeUpTransformTest(TrivialTransformTest):
         0.4,
         0.0,
         0.0,
-        0.303030303030303,
+        0.3333333333333333,
     ]
 
 
 class ChinesePluralTransformTest(unittest.TestCase):
     maxDiff=None
     def test(self):
-        self.assertEqual(dict(transform(self.input, size=1919)),
+        self.assertEqual(dict(transform(self.input, max_r=1918)),
                          dict(self.output))
 
     input = collections.defaultdict(lambda:0)
@@ -212,5 +213,5 @@ class ChinesePluralTransformTest(unittest.TestCase):
         (109, 0.028985507246376812),
         (177, 0.006872852233676976),
         (400, 2/(1918-177)),
-        (1918, 0.00022735514351225047),
+        (1918, 1/(1918 - 400)),
     ]))
