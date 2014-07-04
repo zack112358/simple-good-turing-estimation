@@ -12,7 +12,7 @@ from __future__ import division
 import unittest
 import collections
 import copy
-from math import log, exp, fsum
+from math import log, exp, fsum, floor
 import numpy
 
 from . import averaging_transform
@@ -248,9 +248,13 @@ class ChinesePluralsTest(unittest.TestCase):
     norm_constant = 1.006782
     a, b = (6.683387, -1.964591)
 
-    def assertAlmostEqual(self, left, right, msg=None, places=3):
+    def assertAlmostEqual(self, left, right, msg=None, places=None):
         if msg:
             msg = msg + (" (%r ≠ %r)" % (left, right))
+        if places is None:
+            # Six significant figures
+            places = 5 - int(floor(log(abs(right)) / log(10)))
+            print right, places
         unittest.TestCase.assertAlmostEqual(
             self, left, right, msg=msg, places=places)
 
@@ -282,11 +286,9 @@ class ChinesePluralsTest(unittest.TestCase):
         estimator = Estimator(N=self.input, max_r=self.max_r)
         self.assertAlmostEqual(estimator.a,
                                self.a,
-                               places=6,
                                msg="Linear regression intercept")
         self.assertAlmostEqual(estimator.b,
                                self.b,
-                               places=6,
                                msg="Linear regression slope")
 
 
