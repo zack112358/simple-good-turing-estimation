@@ -267,7 +267,6 @@ class ChinesePluralsTest(unittest.TestCase):
                                    (self.norm_constant if key > 0 else 1),
                                    msg=("%d* (unnormalized)" % (key,)))
 
-
     def test_output(self):
         estimator = Estimator(N=self.input, max_r=self.max_r)
         keys = sorted(self.output.keys())
