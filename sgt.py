@@ -12,7 +12,7 @@ from __future__ import division
 import unittest
 import collections
 import copy
-from math import log, exp
+from math import log, exp, fsum
 import numpy
 
 from . import averaging_transform
@@ -50,13 +50,21 @@ class Estimator(object):
         Do the necessary precomputation to compute estimates
         """
         N = self.N
-        N[0] = sum(N[r] for r in range(1, self.max_r + 1))
+        # Store 'N' as used by Gale in N[0]
+        N[0] = sum(N[r] * r for r in range(1, self.max_r + 1))
         self.Z = Z = averaging_transform.transform(N, self.max_r)  # Z[r] = Z_r
         self.b, self.a = self._regress(Z)    # 'a' and 'b' as used in (Gale); a
                                              # is intercept and b is slope.
         # Find the transition point between linear Good-Turing estimate and the
         # Turing estimate.
         self.linear_cutoff = self._find_cutoff()
+        self.norm_constant = self._find_norm_constant()
+
+    def _find_norm_constant(self):
+        N = self.N
+        return ((1 - self.rstar_unnorm(0)) /
+                fsum(N[r] * self.p_unnorm(r)
+                     for r in range(1, self.max_r + 1)))
 
     def _regress(self, Z):
         """
@@ -76,13 +84,13 @@ class Estimator(object):
         significantly different.
         """
         cutoff = 1
-        while ((self.linear_estimate(cutoff) -
-                self.turing_estimate(cutoff))**2
-                > self._approx_turing_variance(cutoff)):
+        while ((self.linear_rstar_unnorm(cutoff) -
+                self.turing_rstar_unnorm(cutoff))**2
+                > self.approx_turing_variance(cutoff)):
             cutoff += 1
         return cutoff
 
-    def _approx_turing_variance(self, r):
+    def approx_turing_variance(self, r):
         """
         Compute the approximate variance of the turing estimate for r* given r,
         using the approximation given in (Gale):
@@ -92,8 +100,7 @@ class Estimator(object):
         N = self.N
         return (r + 1)**2 * (N[r+1] / N[r]**2) * (1 + N[r+1] / N[r])
 
-    @memoize(dict)
-    def linear_estimate(self, r):
+    def linear_rstar_unnorm(self, r):
         """
         Linear Good-Turing estimate of r* for given r:
              log(N_r) = a + b log(r)
@@ -105,8 +112,7 @@ class Estimator(object):
         """
         return r * (1 + 1/r)**(self.b + 1) if r > 0 else None
 
-    @memoize(dict)
-    def turing_estimate(self, r):
+    def turing_rstar_unnorm(self, r):
         """
         simple Turing estimate of r* for given r (unsmoothed):
              r* = (r + 1)(N_{r+1})/N_r
@@ -116,10 +122,20 @@ class Estimator(object):
                 else None)
 
     @memoize(dict)
-    def estimate(self, r):
-        return (self.linear_estimate(r)
-                if r >= self.linear_cutoff
-                else self.turing_estimate(r))
+    def rstar_unnorm(self, r):
+        return (self.linear_rstar_unnorm(r) if r >= self.linear_cutoff
+                else self.turing_rstar_unnorm(r))
+
+    @memoize(dict)
+    def rstar(self, r):
+        return (self.rstar_unnorm(0) if r == 0
+                else self.rstar_unnorm(r) * self.norm_constant)
+
+    def p_unnorm(self, r):
+        return self.rstar_unnorm(r) / self.N[0]
+
+    def p(self, r):
+        return self.rstar(r) / self.N[0]
 
 
 class ChinesePluralsTest(unittest.TestCase):
@@ -229,12 +245,49 @@ class ChinesePluralsTest(unittest.TestCase):
         (1918, 1930.037),
     ])
 
+    norm_constant = 1.006782
+    a, b = (6.683387, -1.964591)
+
+    def assertAlmostEqual(self, left, right, msg=None, places=3):
+        if msg:
+            msg = msg + (" (%r ≠ %r)" % (left, right))
+        unittest.TestCase.assertAlmostEqual(
+            self, left, right, msg=msg, places=places)
+
+    def test_unnorm_output(self):
+        estimator = Estimator(N=self.input, max_r=self.max_r)
+        keys = sorted(self.output.keys())
+        for key in keys :
+            self.assertAlmostEqual(estimator.rstar_unnorm(key),
+                                   self.output[key] / 
+                                   (self.norm_constant if key > 0 else 1),
+                                   msg=("%d* (unnormalized)" % (key,)))
+
+
     def test_output(self):
         estimator = Estimator(N=self.input, max_r=self.max_r)
-        for key in reversed(self.output.keys()):
-            self.assertAlmostEqual(estimator.estimate(key),
+        keys = sorted(self.output.keys())
+        for key in keys:
+            self.assertAlmostEqual(estimator.rstar(key),
                                    self.output[key],
-                                   places=4)
+                                   msg=("%d* (normalized)" % (key,)))
+
+    def test_constant(self):
+        estimator = Estimator(N=self.input, max_r=self.max_r)
+        self.assertAlmostEqual(estimator.norm_constant,
+                               self.norm_constant,
+                               msg="Normalization constant")
+
+    def test_linear(self):
+        estimator = Estimator(N=self.input, max_r=self.max_r)
+        self.assertAlmostEqual(estimator.a,
+                               self.a,
+                               places=6,
+                               msg="Linear regression intercept")
+        self.assertAlmostEqual(estimator.b,
+                               self.b,
+                               places=6,
+                               msg="Linear regression slope")
 
 
 class ProsodyTest(ChinesePluralsTest):
@@ -370,3 +423,5 @@ class ProsodyTest(ChinesePluralsTest):
         (6925, 6918.687),
         (7846, 7838.899),
     ])
+    norm_constant = 0.9991445
+    a, b = (4.468558, -1.389374)
