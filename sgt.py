@@ -55,6 +55,8 @@ class Estimator(object):
         self.Z = Z = averaging_transform.transform(N, self.max_r)  # Z[r] = Z_r
         self.b, self.a = self._regress(Z)    # 'a' and 'b' as used in (Gale); a
                                              # is intercept and b is slope.
+        assert self.b < -1, ("Log-linear slope > -1 (%f); SGT not applicable" %
+                              self.b)
         # Find the transition point between linear Good-Turing estimate and the
         # Turing estimate.
         self.linear_cutoff = self._find_cutoff()
@@ -136,6 +138,19 @@ class Estimator(object):
 
     def p(self, r):
         return self.rstar(r) / self.N[0]
+
+
+class TooFlatTest(unittest.TestCase):
+    input = collections.defaultdict(lambda:0)
+    input.update([
+        (1, 1),
+        (2, 1),
+    ])
+    max_r = 2
+    
+    def test_failure(self):
+        with self.assertRaises(AssertionError):
+            estimator = Estimator(N=self.input, max_r=self.max_r)
 
 
 class ChinesePluralsTest(unittest.TestCase):
@@ -254,7 +269,6 @@ class ChinesePluralsTest(unittest.TestCase):
         if places is None:
             # Six significant figures
             places = 5 - int(floor(log(abs(right)) / log(10)))
-            print right, places
         unittest.TestCase.assertAlmostEqual(
             self, left, right, msg=msg, places=places)
 
@@ -426,3 +440,58 @@ class ProsodyTest(ChinesePluralsTest):
     ])
     norm_constant = 0.9991445
     a, b = (4.468558, -1.389374)
+
+
+class MadeUpTest(ChinesePluralsTest):
+    input = collections.defaultdict(lambda:0)
+    input.update([
+        (1, 200),
+        (2, 20),
+        (3, 12),
+        (4, 5),
+        (6, 7),
+        (8, 4),
+        (9, 2),
+        (10, 3),
+        (11, 1),
+        (13, 2),
+        (16, 1),
+        (19, 1),
+        (30, 1),
+    ])
+    output = copy.copy(input)
+    output.update([
+        (0, 0.3846154),
+        (1, 0.2069015),
+        (2, 1.316592),
+        (3, 2.252004),
+        (4, 3.226675),
+        (6, 5.226975),
+        (8, 7.257669),
+        (9, 8.27874),
+        (10, 9.302245),
+        (11, 10.32758),
+        (13, 12.38216),
+        (16, 15.47039),
+        (19, 18.5632),
+        (30, 29.92122),
+    ])
+    a, b = 4.933901, -2.114833 
+    norm_constant = 1.034508 
+
+
+class TrivialTest(ChinesePluralsTest):
+    input = collections.defaultdict(lambda:0)
+    input.update([
+        (1, 4),
+        (2, 1),
+    ])
+    max_r = 2
+    a, b = 1.386294, -2 
+    norm_constant = 0.6
+    output = copy.copy(input)
+    output.update([
+        (0, 2/3),
+        (1, .3),
+        (2, .8),
+    ])
