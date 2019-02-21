@@ -15,4 +15,6 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     classifiers=["Programming Language :: Python :: 3",
                  "License :: OSI Approved :: BSD License",
-                 "Operating System :: OS Independent"],)
+                 "Operating System :: OS Independent"],
+    install_requires=['numpy', 'memo'],
+)

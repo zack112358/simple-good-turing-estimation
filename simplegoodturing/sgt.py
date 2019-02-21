@@ -80,7 +80,7 @@ class Estimator(object):
                                for r in range(1, self.max_r + 1) if Z[r]])
         self.x, self.y = x, y
         matrix = numpy.array((x, numpy.ones(len(x)))).T
-        return numpy.linalg.lstsq(matrix, y)[0]
+        return numpy.linalg.lstsq(matrix, y, rcond=None)[0]
 
     def _find_cutoff(self):
         """
