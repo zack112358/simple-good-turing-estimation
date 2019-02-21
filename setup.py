@@ -5,7 +5,7 @@ with open("README.md", "r") as readme:
 
 setuptools.setup(
     name="simple-good-turing",
-    version="0.0.2",
+    version="0.0.3",
     author="Zachary McCord",
     author_email="zjmccord@gmail.com",
     description="Simple Good-Turing smoothing",
