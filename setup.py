@@ -5,7 +5,7 @@ with open("README.md", "r") as readme:
 
 setuptools.setup(
     name="simple-good-turing",
-    version="0.0.1",
+    version="0.0.2",
     author="Zachary McCord",
     author_email="zjmccord@gmail.com",
     description="Simple Good-Turing smoothing",
@@ -16,5 +16,5 @@ setuptools.setup(
     classifiers=["Programming Language :: Python :: 3",
                  "License :: OSI Approved :: BSD License",
                  "Operating System :: OS Independent"],
-    install_requires=['numpy', 'memo'],
+    install_requires=['numpy', 'python-memo'],
 )
