@@ -9,6 +9,7 @@ Quantitative Linguistics, 2:217-37, 1995.
 
 from __future__ import division
 
+from collections import defaultdict
 import unittest
 import collections
 import copy
@@ -16,7 +17,8 @@ from math import log, exp, fsum, floor
 import numpy
 
 from . import averaging_transform
-from .memo import memoize
+
+from memo import instancememo
 
 
 class Estimator(object):
@@ -30,17 +32,16 @@ class Estimator(object):
     'b' is used as defined in the paper and is the log-log slope of N[r] with
     respect to r. It needs to be < -1 for SGT smoothing to be applicable.
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, N, *args, **kwargs):
         """
         Create a Simple Good Turing estimator for the given N_r values (as
         specified in the 'N' kwarg). N[r] == N_r, so N[0] should be blank.
-
-        The maximum r value is assumed to be len[N] unless specified otherwise
-        with max_r. This enables use of defaultdict instead of list to specify
-        N_r values.
         """
-        self.N = copy.copy(kwargs.pop('N'))
-        self.max_r = kwargs.pop('max_r', len(self.N))
+        self.N = copy.copy(N)
+        if isinstance(self.N, list):
+            self.max_r = len(self.N)
+        elif isinstance(self.N, dict) or isinstance(self.N, defaultdict):
+            self.max_r = max(self.N.keys())
         super(Estimator, self).__init__(*args, **kwargs)
         assert not self.N[0]
         self._precompute()
@@ -50,7 +51,8 @@ class Estimator(object):
         Do the necessary precomputation to compute estimates
         """
         N = self.N
-        # Store 'N' as used by Gale in N[0]
+        # Store 'N' as used by Gale in N[0] --- this is the total # of
+        # occurrences.
         N[0] = sum(N[r] * r for r in range(1, self.max_r + 1))
         self.Z = Z = averaging_transform.transform(N, self.max_r)  # Z[r] = Z_r
         self.b, self.a = self._regress(Z)    # 'a' and 'b' as used in (Gale); a
@@ -123,12 +125,12 @@ class Estimator(object):
                 if self.N[r + 1] > 0 and self.N[r] > 0
                 else None)
 
-    @memoize(dict)
+    @instancememo
     def rstar_unnorm(self, r):
         return (self.linear_rstar_unnorm(r) if r >= self.linear_cutoff
                 else self.turing_rstar_unnorm(r))
 
-    @memoize(dict)
+    @instancememo
     def rstar(self, r):
         return (self.rstar_unnorm(0) if r == 0
                 else self.rstar_unnorm(r) * self.norm_constant)
@@ -150,7 +152,7 @@ class TooFlatTest(unittest.TestCase):
     
     def test_failure(self):
         with self.assertRaises(AssertionError):
-            estimator = Estimator(N=self.input, max_r=self.max_r)
+            estimator = Estimator(N=self.input)
 
 
 class ChinesePluralsTest(unittest.TestCase):
@@ -273,7 +275,7 @@ class ChinesePluralsTest(unittest.TestCase):
             self, left, right, msg=msg, places=places)
 
     def test_unnorm_output(self):
-        estimator = Estimator(N=self.input, max_r=self.max_r)
+        estimator = Estimator(N=self.input)
         keys = sorted(self.output.keys())
         for key in keys :
             self.assertAlmostEqual(estimator.rstar_unnorm(key),
@@ -282,7 +284,7 @@ class ChinesePluralsTest(unittest.TestCase):
                                    msg=("%d* (unnormalized)" % (key,)))
 
     def test_output(self):
-        estimator = Estimator(N=self.input, max_r=self.max_r)
+        estimator = Estimator(N=self.input)
         keys = sorted(self.output.keys())
         for key in keys:
             self.assertAlmostEqual(estimator.rstar(key),
@@ -290,13 +292,13 @@ class ChinesePluralsTest(unittest.TestCase):
                                    msg=("%d* (normalized)" % (key,)))
 
     def test_constant(self):
-        estimator = Estimator(N=self.input, max_r=self.max_r)
+        estimator = Estimator(N=self.input)
         self.assertAlmostEqual(estimator.norm_constant,
                                self.norm_constant,
                                msg="Normalization constant")
 
     def test_linear(self):
-        estimator = Estimator(N=self.input, max_r=self.max_r)
+        estimator = Estimator(N=self.input)
         self.assertAlmostEqual(estimator.a,
                                self.a,
                                msg="Linear regression intercept")
