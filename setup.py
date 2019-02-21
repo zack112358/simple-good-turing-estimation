@@ -4,7 +4,7 @@ with open("README.md", "r") as readme:
     long_description = readme.read()
 
 setuptools.setup(
-    name="sgt-zjmccord",
+    name="simple_good_turing",
     version="0.0.1",
     author="Zachary McCord",
     author_email="zjmccord@gmail.com",
