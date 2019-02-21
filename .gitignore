@@ -4,3 +4,4 @@ junk
 *.egg-info
 *.pyc
 .*
+virtualenv
